@@ -103,5 +103,12 @@
               };
           in
           pkgs.callPackage drv { };
+
+        packages.fteqw-sv-wrapper = pkgs.callPackage ./wrapper.nix { inherit (packages) fteqw-sv; };
+
+        defaultPackage =
+          if (pkgs.stdenv.isLinux)
+          then packages.fteqw-sv-wrapper
+          else packages.fteqw-sv;
       });
 }
