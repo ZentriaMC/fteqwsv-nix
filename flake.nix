@@ -24,9 +24,11 @@
               { lib
               , stdenv
               , fetchFromGitHub
+              , pkg-config
+              , gnutls
               , zlib
               , zip
-              , pkg-config
+              , which
               }:
               let
                 system' = stdenv.hostPlatform.system;
@@ -39,7 +41,10 @@
                   "x86_64-linux" = { target = "linux"; bits = "64"; };
                 }."${system'}" or (throw "Unsupported system ${system'}");
 
-                binname' = "fteqw-${target'.target}-sv${target'.bits}";
+                binname' =
+                  if (target'.target == "macosx")
+                  then "fteqw-${target'.target}-sv${target'.bits}"
+                  else "fteqw-sv${target'.bits}";
               in
               stdenv.mkDerivation rec {
                 pname = "fteqw-sv";
@@ -57,30 +62,19 @@
 
                 buildInputs = [
                   zlib
+                ] ++ lib.optionals stdenv.isLinux [
+                  gnutls
                 ];
 
                 nativeBuildInputs = [
                   pkg-config
+                  which
                   zip
                 ];
 
                 sourceRoot = "source/engine";
                 dontConfigure = true;
                 dontStrip = true;
-
-                postPatch = ''
-                  substituteInPlace Makefile \
-                    --replace "PKGCONFIG=/bin/true" ""
-
-                  substituteInPlace ../plugins/Makefile \
-                    --replace "-static-libgcc" "" \
-                    --replace "-static-libstdc++" "" \
-                    --replace "-R/usr/local/lib" ""
-
-                '' + lib.optionalString stdenv.isDarwin ''
-                  substituteInPlace ../plugins/Makefile \
-                    --replace "-Wl,--no-undefined" ""
-                '';
 
                 makeFlags = [
                   "FTE_TARGET=${target'.target}"
@@ -99,8 +93,8 @@
 
                 buildFlags = [ "sv-rel" ];
 
-                # No official support for aarch64-darwin
-                NIX_CFLAGS_COMPILE = lib.optionalString (system' == "aarch64-darwin") (toString [
+                NIX_CFLAGS_COMPILE = toString (lib.optionals (system' == "aarch64-darwin") [
+                  # No official support for aarch64-darwin
                   "-Wno-macro-redefined"
                   "-DQ3_LITTLE_ENDIAN"
                   "-DARCH_STRING=arm"
